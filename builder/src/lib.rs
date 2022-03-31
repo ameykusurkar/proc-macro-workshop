@@ -6,7 +6,7 @@ use syn::{parse_macro_input, DeriveInput};
 pub fn derive(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
     let ident = &ast.ident;
-    let b_ident = syn::Ident::new(&format!("{}Builder", ident.to_string()), ident.span());
+    let b_ident = syn::Ident::new(&format!("{}Builder", ident), ident.span());
 
     let expanded = quote! {
         pub struct #b_ident {
