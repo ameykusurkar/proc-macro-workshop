@@ -17,6 +17,18 @@ pub fn derive(input: TokenStream) -> TokenStream {
             #ident: ::std::option::Option<#ty>,
         }
     });
+    let build_fields = fields.iter().map(|field| {
+        let ident = &field.ident;
+        quote! {
+            #ident: self.#ident.clone().ok_or("error")?,
+        }
+    });
+    let builder_empty = fields.iter().map(|field| {
+        let ident = &field.ident;
+        quote! {
+            #ident: None,
+        }
+    });
     let methods = fields.iter().map(|field| {
         let ident = &field.ident;
         let ty = &field.ty;
@@ -32,10 +44,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
         impl #ident {
             pub fn builder() -> #b_ident {
                 #b_ident {
-                    executable: None,
-                    args: None,
-                    env: None,
-                    current_dir: None,
+                    #(#builder_empty)*
                 }
             }
         }
@@ -44,6 +53,11 @@ pub fn derive(input: TokenStream) -> TokenStream {
         }
         impl #b_ident {
             #(#methods)*
+            pub fn build(&mut self) -> Result<#ident, String> {
+                Ok(#ident {
+                    #(#build_fields)*
+                })
+            }
         }
     };
 
