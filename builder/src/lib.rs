@@ -5,16 +5,30 @@ use syn::{parse_macro_input, DeriveInput};
 #[proc_macro_derive(Builder)]
 pub fn derive(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
-    let ident = &ast.ident;
+
+    let ident = ast.ident.clone();
     let b_ident = syn::Ident::new(&format!("{}Builder", ident), ident.span());
 
-    let expanded = quote! {
-        pub struct #b_ident {
-            executable: Option<String>,
-            args: Option<Vec<String>>,
-            env: Option<Vec<String>>,
-            current_dir: Option<String>,
+    let fields = extract_fields(ast);
+    let optionized_fields = fields.iter().map(|field| {
+        let ident = &field.ident;
+        let ty = &field.ty;
+        quote! {
+            #ident: ::std::option::Option<#ty>,
         }
+    });
+    let methods = fields.iter().map(|field| {
+        let ident = &field.ident;
+        let ty = &field.ty;
+        quote! {
+            fn #ident(&mut self, #ident: #ty) -> &mut Self {
+                self.#ident = Some(#ident);
+                self
+            }
+        }
+    });
+
+    let expanded = quote! {
         impl #ident {
             pub fn builder() -> #b_ident {
                 #b_ident {
@@ -25,25 +39,27 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 }
             }
         }
+        pub struct #b_ident {
+            #(#optionized_fields)*
+        }
         impl #b_ident {
-            fn executable(&mut self, executable: String) -> &mut Self {
-                self.executable = Some(executable);
-                self
-            }
-            fn args(&mut self, args: Vec<String>) -> &mut Self {
-                self.args = Some(args);
-                self
-            }
-            fn env(&mut self, env: Vec<String>) -> &mut Self {
-                self.env = Some(env);
-                self
-            }
-            fn current_dir(&mut self, current_dir: String) -> &mut Self {
-                self.current_dir = Some(current_dir);
-                self
-            }
+            #(#methods)*
         }
     };
 
     TokenStream::from(expanded)
+}
+
+fn extract_fields(
+    ast: syn::DeriveInput,
+) -> syn::punctuated::Punctuated<syn::Field, syn::token::Comma> {
+    if let syn::Data::Struct(syn::DataStruct {
+        fields: syn::Fields::Named(fields),
+        ..
+    }) = ast.data
+    {
+        fields.named
+    } else {
+        unimplemented!("Cannot derive builder unless struct")
+    }
 }
